@@ -17,15 +17,16 @@ var (
 	trains          []train.Train
 	parcels         []parcel.Parcel
 	graph           map[int][]edge.Edge // Adjacency list of graph edges
-	nodeA           = node.NewNode(1, "A")
-	nodeB           = node.NewNode(2, "B")
-	nodeC           = node.NewNode(3, "C")
 	moves           []move.Move
-	parcelOwnership = make(map[int]int)
+	parcelOwnership = make(map[int]int) // parcelId --> trainId
 	ownershipLock   sync.Mutex
 )
 
 func initGraph() {
+	nodeA := node.NewNode(1, "A")
+	nodeB := node.NewNode(2, "B")
+	nodeC := node.NewNode(3, "C")
+
 	graph = map[int][]edge.Edge{
 		1: {
 			{Name: "Edge 1-2", FromNode: *nodeA, ToNode: *nodeB, JourneyTime: 30},
@@ -58,7 +59,6 @@ func initGraph() {
 }
 
 func main() {
-	// Initialize input
 	initGraph()
 
 	// Start delivery
@@ -75,13 +75,12 @@ func startDelivery() {
 
 		// Launch each train in its own goroutine
 		for i := range trains {
-			wg.Add(1)
-			go func(train *train.Train) {
-				defer wg.Done()
+			wg.Add(1)                     // add goroutine count
+			go func(train *train.Train) { // use pointer if state will mutate
+				defer wg.Done() // decrement goroutine count
 
 				var pickedUp, droppedOff []string
-				fromNode := graph[train.Current.ID][0].FromNode
-				// Find parcels at the train's current location
+				fromNode := train.Current
 
 				for i := range parcels {
 					p := &parcels[i]
@@ -92,13 +91,15 @@ func startDelivery() {
 					ownershipLock.Unlock()
 
 					if isUnclaimed || isAssignedToThisTrain {
+						// Lock package
 						p.Mutex.Lock()
 
+						// If train at same station as package
 						if !p.Delivered && !p.PickedUp && p.StartNode == train.Current {
 							// if train did not exceed capacity
 							if train.CurrentWeight+p.Weight <= train.Capacity {
+								// assign ownership - Good to have to keep track of which train owns the parcel
 								ownershipLock.Lock()
-								// train.CurrentWeight += p.Weight
 								parcelOwnership[p.ID] = train.ID
 								ownershipLock.Unlock()
 

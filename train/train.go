@@ -1,8 +1,6 @@
 package train
 
 import (
-	"sync"
-
 	"github.com/bryantang1107/PostRail/node"
 )
 
@@ -14,5 +12,4 @@ type Train struct {
 	Current       node.Node // Current node ID
 	Previous      node.Node // Previous node ID
 	Load          []int
-	Mu            sync.Mutex
 }
